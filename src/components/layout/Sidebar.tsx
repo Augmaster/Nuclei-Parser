@@ -8,6 +8,8 @@ import {
   Server,
   FileCode,
   Settings,
+  ShieldAlert,
+  GitCompare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStats } from '@/store/findingsStore';
@@ -29,7 +31,9 @@ const navItems = [
   { to: '/upload', icon: Upload, label: 'Upload' },
   { to: '/findings', icon: List, label: 'Findings' },
   { to: '/hosts', icon: Server, label: 'By Host' },
+  { to: '/host-risk', icon: ShieldAlert, label: 'Host Risk' },
   { to: '/templates', icon: FileCode, label: 'By Template' },
+  { to: '/comparison', icon: GitCompare, label: 'Compare Scans' },
   { to: '/export', icon: Download, label: 'Export' },
 ];
 

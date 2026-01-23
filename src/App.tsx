@@ -8,7 +8,9 @@ import { UploadPage } from '@/pages/Upload';
 import { FindingsPage } from '@/pages/Findings';
 import { FindingDetailPage } from '@/pages/FindingDetailPage';
 import { HostsPage } from '@/pages/Hosts';
+import { HostRiskPage } from '@/pages/HostRisk';
 import { TemplatesPage } from '@/pages/Templates';
+import { ScanComparisonPage } from '@/pages/ScanComparison';
 import { ExportPage } from '@/pages/Export';
 import { CompaniesPage } from '@/pages/Companies';
 import { ProjectsPage } from '@/pages/Projects';
@@ -41,7 +43,9 @@ function App() {
             <Route path="findings" element={<FindingsPage />} />
             <Route path="findings/:id" element={<FindingDetailPage />} />
             <Route path="hosts" element={<HostsPage />} />
+            <Route path="host-risk" element={<HostRiskPage />} />
             <Route path="templates" element={<TemplatesPage />} />
+            <Route path="comparison" element={<ScanComparisonPage />} />
             <Route path="export" element={<ExportPage />} />
             <Route path="companies" element={<CompaniesPage />} />
             <Route path="projects" element={<ProjectsPage />} />

@@ -1,4 +1,4 @@
-import { Building2, ChevronDown, Plus } from 'lucide-react';
+import { Building2, ChevronDown, Plus, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -66,7 +66,7 @@ export function CompanySelector({ onCreateNew, onManage }: CompanySelectorProps)
         )}
         {onManage && (
           <DropdownMenuItem onClick={onManage}>
-            <Building2 className="h-4 w-4 mr-2" />
+            <Settings className="h-4 w-4 mr-2" />
             Manage Companies
           </DropdownMenuItem>
         )}

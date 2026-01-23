@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import type { NucleiFinding, UploadedFile, FilterState, Stats } from '@/types/nuclei';
+import type { NucleiFinding, UploadedFile, FilterState, Stats, FindingStatus, FindingStatusChange } from '@/types/nuclei';
 import { uploadedFileFromRecord, uploadedFileToRecord } from '@/types/nuclei';
 import * as db from '@/services/db/indexedDB';
 
@@ -35,6 +35,8 @@ interface FindingsState {
   clearAll: () => void;
   setFilters: (filters: Partial<FilterState>) => void;
   resetFilters: () => void;
+  updateFinding: (finding: NucleiFinding) => void;
+  bulkUpdateStatus: (ids: string[], status: FindingStatus, reason?: string) => Promise<void>;
 
   // Project-scoped loading
   loadProjectData: (projectId: string) => Promise<void>;
@@ -297,6 +299,71 @@ export const useFindingsStore = create<FindingsState>((set, get) => ({
       filters: defaultFilters,
       filteredFindings: state.findings,
     }));
+  },
+
+  updateFinding: (updatedFinding: NucleiFinding) => {
+    set(state => {
+      const findings = state.findings.map(f =>
+        f.id === updatedFinding.id ? updatedFinding : f
+      );
+      const filteredFindings = applyFilters(findings, state.filters);
+
+      return { findings, filteredFindings };
+    });
+  },
+
+  bulkUpdateStatus: async (ids: string[], status: FindingStatus, reason?: string) => {
+    const { findings } = get();
+    const updatedFindings: NucleiFinding[] = [];
+    const statusChanges: FindingStatusChange[] = [];
+    const timestamp = new Date().toISOString();
+
+    // Prepare updates
+    for (const id of ids) {
+      const finding = findings.find(f => f.id === id);
+      if (finding) {
+        const currentStatus = finding.status || 'new';
+        if (currentStatus !== status) {
+          const updatedFinding: NucleiFinding = {
+            ...finding,
+            status,
+          };
+          updatedFindings.push(updatedFinding);
+
+          // Create status change record
+          statusChanges.push({
+            id: crypto.randomUUID(),
+            findingId: id,
+            fromStatus: currentStatus,
+            toStatus: status,
+            changedBy: 'Tester', // TODO: configurable user
+            reason,
+            changedAt: timestamp,
+          });
+        }
+      }
+    }
+
+    // Persist to IndexedDB
+    for (const finding of updatedFindings) {
+      await db.updateFinding(finding);
+    }
+    for (const change of statusChanges) {
+      await db.addStatusChange(change);
+    }
+
+    // Update in-memory state
+    set(state => {
+      const updatedIds = new Set(updatedFindings.map(f => f.id));
+      const newFindings = state.findings.map(f =>
+        updatedIds.has(f.id) ? updatedFindings.find(uf => uf.id === f.id)! : f
+      );
+      const filteredFindings = applyFilters(newFindings, state.filters);
+
+      return { findings: newFindings, filteredFindings };
+    });
+
+    toast.success(`Updated status for ${updatedFindings.length} finding${updatedFindings.length !== 1 ? 's' : ''}`);
   },
 }));
 

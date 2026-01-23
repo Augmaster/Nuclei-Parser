@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatTimestamp } from '@/lib/utils';
+import { toast } from 'sonner';
 import {
   ChevronDown,
   ChevronUp,
@@ -11,6 +12,11 @@ import {
   ChevronRight,
   Filter,
   Upload,
+  MoreHorizontal,
+  Eye,
+  Copy,
+  ExternalLink,
+  FileText,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -24,22 +30,28 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
 import { SeverityBadge } from './SeverityBadge';
+import { BulkActionBar } from './BulkActionBar';
 import {
   useFindingsStore,
   useFilteredFindings,
   useUniqueHosts,
   useUniqueTemplates,
+  useUniqueTags,
+  useUniqueTypes,
   useFilters,
 } from '@/store/findingsStore';
-import type { Severity } from '@/types/nuclei';
+import { formatAsMarkdown, formatAsGitHubIssue, copyToClipboard as copyFormat } from '@/lib/copyFormats';
+import type { Severity, FindingStatus } from '@/types/nuclei';
 
 type SortField = 'severity' | 'templateId' | 'host' | 'timestamp';
 type SortDirection = 'asc' | 'desc';
@@ -53,19 +65,119 @@ const severityOrder: Record<Severity, number> = {
   unknown: 5,
 };
 
+// Severity options for multi-select
+const severityOptions: MultiSelectOption[] = [
+  { value: 'critical', label: 'Critical' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+  { value: 'info', label: 'Info' },
+];
+
+// Helper to copy text to clipboard
+const copyToClipboard = async (text: string, label: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
+  } catch {
+    toast.error('Failed to copy to clipboard');
+  }
+};
+
+// SortIcon component - moved outside to avoid recreation during render
+interface SortIconProps {
+  field: SortField;
+  sortField: SortField;
+  sortDirection: SortDirection;
+}
+
+function SortIcon({ field, sortField, sortDirection }: SortIconProps) {
+  if (sortField !== field) return <ChevronsUpDown className="h-4 w-4 ml-1 opacity-50" />;
+  return sortDirection === 'asc' ? (
+    <ChevronUp className="h-4 w-4 ml-1 text-primary" />
+  ) : (
+    <ChevronDown className="h-4 w-4 ml-1 text-primary" />
+  );
+}
+
 export function FindingsTable() {
   const navigate = useNavigate();
   const findings = useFilteredFindings();
   const filters = useFilters();
   const setFilters = useFindingsStore(state => state.setFilters);
   const resetFilters = useFindingsStore(state => state.resetFilters);
+  const bulkUpdateStatus = useFindingsStore(state => state.bulkUpdateStatus);
   const uniqueHosts = useUniqueHosts();
   const uniqueTemplates = useUniqueTemplates();
+  const uniqueTags = useUniqueTags();
+  const uniqueTypes = useUniqueTypes();
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Convert to MultiSelectOption format
+  const hostOptions: MultiSelectOption[] = useMemo(
+    () => uniqueHosts.filter(h => h?.trim()).slice(0, 100).map(h => ({
+      value: h,
+      label: h.length > 40 ? h.slice(0, 40) + '...' : h,
+    })),
+    [uniqueHosts]
+  );
+
+  const templateOptions: MultiSelectOption[] = useMemo(
+    () => uniqueTemplates.filter(t => t?.trim()).slice(0, 100).map(t => ({
+      value: t,
+      label: t.length > 40 ? t.slice(0, 40) + '...' : t,
+    })),
+    [uniqueTemplates]
+  );
+
+  const tagOptions: MultiSelectOption[] = useMemo(
+    () => uniqueTags.filter(t => t?.trim()).slice(0, 100).map(t => ({
+      value: t,
+      label: t,
+    })),
+    [uniqueTags]
+  );
+
+  const typeOptions: MultiSelectOption[] = useMemo(
+    () => uniqueTypes.filter(t => t?.trim()).map(t => ({
+      value: t,
+      label: t,
+    })),
+    [uniqueTypes]
+  );
 
   const [sortField, setSortField] = useState<SortField>('severity');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [page, setPage] = useState(0);
   const pageSize = 50;
+
+  // Selection helpers
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const handleBulkStatusChange = useCallback(async (status: FindingStatus, reason?: string) => {
+    await bulkUpdateStatus(Array.from(selectedIds), status, reason);
+  }, [selectedIds, bulkUpdateStatus]);
+
+  // Get selected findings for bulk actions
+  const selectedFindings = useMemo(() => {
+    return findings.filter(f => selectedIds.has(f.id));
+  }, [findings, selectedIds]);
 
   const sortedFindings = useMemo(() => {
     return [...findings].sort((a, b) => {
@@ -98,6 +210,32 @@ export function FindingsTable() {
 
   const totalPages = Math.ceil(sortedFindings.length / pageSize);
 
+  // Page-level selection helpers
+  const selectedOnPage = useMemo(() => {
+    return paginatedFindings.filter(f => selectedIds.has(f.id)).length;
+  }, [paginatedFindings, selectedIds]);
+
+  const isAllPageSelected = selectedOnPage === paginatedFindings.length && paginatedFindings.length > 0;
+  const isPartialPageSelected = selectedOnPage > 0 && selectedOnPage < paginatedFindings.length;
+
+  const togglePageSelection = useCallback(() => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (isAllPageSelected) {
+        // Deselect all on page
+        for (const f of paginatedFindings) {
+          next.delete(f.id);
+        }
+      } else {
+        // Select all on page
+        for (const f of paginatedFindings) {
+          next.add(f.id);
+        }
+      }
+      return next;
+    });
+  }, [isAllPageSelected, paginatedFindings]);
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -107,26 +245,21 @@ export function FindingsTable() {
     }
   };
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ChevronsUpDown className="h-4 w-4 ml-1 opacity-50" />;
-    return sortDirection === 'asc' ? (
-      <ChevronUp className="h-4 w-4 ml-1 text-primary" />
-    ) : (
-      <ChevronDown className="h-4 w-4 ml-1 text-primary" />
-    );
-  };
-
   const hasActiveFilters =
     filters.search ||
     filters.severities.length > 0 ||
     filters.hosts.length > 0 ||
-    filters.templates.length > 0;
+    filters.templates.length > 0 ||
+    filters.tags.length > 0 ||
+    filters.types.length > 0;
 
   const activeFilterCount = [
     filters.search ? 1 : 0,
     filters.severities.length,
     filters.hosts.length,
     filters.templates.length,
+    filters.tags.length,
+    filters.types.length,
   ].reduce((a, b) => a + b, 0);
 
   if (findings.length === 0 && !hasActiveFilters) {
@@ -165,62 +298,45 @@ export function FindingsTable() {
               />
             </div>
 
-            <Select
-              value={filters.severities[0] || 'all'}
-              onValueChange={value =>
-                setFilters({ severities: value === 'all' ? [] : [value as Severity] })
-              }
-            >
-              <SelectTrigger className="w-[140px] bg-muted/50 border-0">
-                <SelectValue placeholder="Severity" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Severities</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="info">Info</SelectItem>
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={severityOptions}
+              selected={filters.severities}
+              onChange={(severities) => setFilters({ severities: severities as Severity[] })}
+              placeholder="Severity"
+              className="w-[140px]"
+            />
 
-            <Select
-              value={filters.hosts[0] || 'all'}
-              onValueChange={value =>
-                setFilters({ hosts: value === 'all' ? [] : [value] })
-              }
-            >
-              <SelectTrigger className="w-[180px] bg-muted/50 border-0">
-                <SelectValue placeholder="Host" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Hosts</SelectItem>
-                {uniqueHosts.filter(h => h && h.trim()).slice(0, 50).map(host => (
-                  <SelectItem key={host} value={host}>
-                    {host.length > 35 ? host.slice(0, 35) + '...' : host}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={hostOptions}
+              selected={filters.hosts}
+              onChange={(hosts) => setFilters({ hosts })}
+              placeholder="Host"
+              className="w-[160px]"
+            />
 
-            <Select
-              value={filters.templates[0] || 'all'}
-              onValueChange={value =>
-                setFilters({ templates: value === 'all' ? [] : [value] })
-              }
-            >
-              <SelectTrigger className="w-[180px] bg-muted/50 border-0">
-                <SelectValue placeholder="Template" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Templates</SelectItem>
-                {uniqueTemplates.filter(t => t && t.trim()).slice(0, 50).map(template => (
-                  <SelectItem key={template} value={template}>
-                    {template.length > 35 ? template.slice(0, 35) + '...' : template}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelect
+              options={templateOptions}
+              selected={filters.templates}
+              onChange={(templates) => setFilters({ templates })}
+              placeholder="Template"
+              className="w-[160px]"
+            />
+
+            <MultiSelect
+              options={tagOptions}
+              selected={filters.tags}
+              onChange={(tags) => setFilters({ tags })}
+              placeholder="Tag"
+              className="w-[140px]"
+            />
+
+            <MultiSelect
+              options={typeOptions}
+              selected={filters.types}
+              onChange={(types) => setFilters({ types })}
+              placeholder="Type"
+              className="w-[120px]"
+            />
 
             {hasActiveFilters && (
               <Button
@@ -252,11 +368,25 @@ export function FindingsTable() {
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedFindings={selectedFindings}
+        onClearSelection={clearSelection}
+        onBulkStatusChange={handleBulkStatusChange}
+      />
+
       {/* Table */}
       <Card className="overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[40px]">
+                <Checkbox
+                  checked={isAllPageSelected ? true : isPartialPageSelected ? 'indeterminate' : false}
+                  onCheckedChange={togglePageSelection}
+                  aria-label="Select all on page"
+                />
+              </TableHead>
               <TableHead
                 className="cursor-pointer select-none hover:text-foreground transition-colors w-[110px]"
                 onClick={() => handleSort('severity')}
@@ -265,7 +395,7 @@ export function FindingsTable() {
               >
                 <div className="flex items-center">
                   Severity
-                  <SortIcon field="severity" />
+                  <SortIcon field="severity" sortField={sortField} sortDirection={sortDirection} />
                 </div>
               </TableHead>
               <TableHead
@@ -276,7 +406,7 @@ export function FindingsTable() {
               >
                 <div className="flex items-center">
                   Template
-                  <SortIcon field="templateId" />
+                  <SortIcon field="templateId" sortField={sortField} sortDirection={sortDirection} />
                 </div>
               </TableHead>
               <TableHead
@@ -287,7 +417,7 @@ export function FindingsTable() {
               >
                 <div className="flex items-center">
                   Host
-                  <SortIcon field="host" />
+                  <SortIcon field="host" sortField={sortField} sortDirection={sortDirection} />
                 </div>
               </TableHead>
               <TableHead>Matched At</TableHead>
@@ -299,9 +429,10 @@ export function FindingsTable() {
               >
                 <div className="flex items-center">
                   Timestamp
-                  <SortIcon field="timestamp" />
+                  <SortIcon field="timestamp" sortField={sortField} sortDirection={sortDirection} />
                 </div>
               </TableHead>
+              <TableHead className="w-[50px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -310,7 +441,15 @@ export function FindingsTable() {
                 key={finding.id}
                 className="cursor-pointer group"
                 onClick={() => navigate(`/findings/${finding.id}`)}
+                data-selected={selectedIds.has(finding.id) || undefined}
               >
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <Checkbox
+                    checked={selectedIds.has(finding.id)}
+                    onCheckedChange={() => toggleSelection(finding.id)}
+                    aria-label={`Select finding ${finding.info.name}`}
+                  />
+                </TableCell>
                 <TableCell>
                   <SeverityBadge severity={finding.info.severity} />
                 </TableCell>
@@ -331,6 +470,50 @@ export function FindingsTable() {
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {formatTimestamp(finding.timestamp)}
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Actions</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => navigate(`/findings/${finding.id}`)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Details
+                      </DropdownMenuItem>
+                      {finding.curlCommand && (
+                        <DropdownMenuItem onClick={() => copyToClipboard(finding.curlCommand!, 'cURL command')}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Copy cURL
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => copyToClipboard(finding.matchedAt || finding.host, 'URL')}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy URL
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => copyFormat(formatAsMarkdown([finding]), 'Markdown')}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Copy as Markdown
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => copyFormat(formatAsGitHubIssue(finding), 'GitHub Issue')}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Copy as GitHub Issue
+                      </DropdownMenuItem>
+                      {finding.templateUrl && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => window.open(finding.templateUrl, '_blank')}>
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            View Template
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}

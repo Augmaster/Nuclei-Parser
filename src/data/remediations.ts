@@ -1,11 +1,17 @@
 // Remediation mapping based on vulnerability types, tags, and CWE references
 // Priority: 1) Template remediation, 2) CWE-based, 3) Tag-based, 4) Type-based
 
+import type { Severity } from '@/types/nuclei';
+
 export interface RemediationInfo {
   title: string;
   description: string;
   steps: string[];
   references?: string[];
+  // Enhanced fields for better guidance
+  urgencyBySeverity?: Partial<Record<Severity, string>>;
+  verificationSteps?: string[];
+  commonMistakes?: string[];
 }
 
 // CWE-based remediations (most specific)
@@ -23,6 +29,25 @@ export const cweRemediations: Record<string, RemediationInfo> = {
     references: [
       'https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html',
     ],
+    urgencyBySeverity: {
+      critical: 'IMMEDIATE ACTION: Stored XSS affecting admin panels or high-privilege users. Take offline if widespread.',
+      high: 'HIGH PRIORITY: Address within 24-48 hours. Implement CSP as temporary mitigation.',
+      medium: 'Schedule fix within current sprint. Review all similar input points.',
+      low: 'Include in regular maintenance cycle.',
+    },
+    verificationSteps: [
+      'Test with basic payload: <script>alert(1)</script>',
+      'Verify output encoding is applied in HTML context',
+      'Check CSP headers are present and blocking inline scripts',
+      'Test with event handlers: <img onerror=alert(1) src=x>',
+      'Verify HttpOnly flag on session cookies',
+    ],
+    commonMistakes: [
+      'Only encoding < and > without handling quotes in attributes',
+      'Client-side only sanitization without server-side validation',
+      'Using blacklist instead of whitelist for allowed characters',
+      'Forgetting to encode in JavaScript context (\\x3c instead of <)',
+    ],
   },
   'CWE-89': {
     title: 'SQL Injection',
@@ -36,6 +61,26 @@ export const cweRemediations: Record<string, RemediationInfo> = {
     ],
     references: [
       'https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html',
+    ],
+    urgencyBySeverity: {
+      critical: 'IMMEDIATE ACTION: This may allow complete database compromise. Consider taking affected systems offline.',
+      high: 'HIGH PRIORITY: Address within 24-48 hours. Implement input validation as temporary mitigation.',
+      medium: 'Schedule fix within current sprint. Monitor for exploitation attempts.',
+      low: 'Include in regular maintenance cycle.',
+    },
+    verificationSteps: [
+      'Test with single quote: \' to check for SQL errors',
+      'Verify parameterized queries are used (check code)',
+      'Test with time-based payload: \' AND SLEEP(5)--',
+      'Confirm database user has minimal privileges',
+      'Check WAF rules are blocking common SQL injection patterns',
+    ],
+    commonMistakes: [
+      'Using string escaping instead of parameterized queries',
+      'Validating input only on client-side',
+      'Missing validation on indirect input sources (headers, cookies)',
+      'Using ORM incorrectly with raw query methods',
+      'Forgetting to parameterize ORDER BY and LIMIT clauses',
     ],
   },
   'CWE-22': {
@@ -223,6 +268,25 @@ export const tagRemediations: Record<string, RemediationInfo> = {
       'Implement network segmentation',
       'Enable detailed logging for forensic analysis',
       'Consider Web Application Firewall (WAF) as temporary mitigation',
+    ],
+    urgencyBySeverity: {
+      critical: 'EMERGENCY: Take affected systems offline immediately. This is the highest severity issue possible.',
+      high: 'CRITICAL PRIORITY: Patch within hours, not days. Isolate system from network if possible.',
+      medium: 'HIGH PRIORITY: Unusual for RCE. Investigate conditions required for exploitation.',
+      low: 'Review exploitation requirements - may need authentication or specific conditions.',
+    },
+    verificationSteps: [
+      'Use safe detection methods (DNS callbacks, sleep delays) - NEVER execute destructive commands',
+      'Verify patch version is installed',
+      'Check if vulnerable endpoint is accessible externally',
+      'Review logs for signs of exploitation',
+      'Confirm WAF rules are blocking known exploit patterns',
+    ],
+    commonMistakes: [
+      'Applying patch but not restarting affected services',
+      'Patching internet-facing systems but forgetting internal ones',
+      'Assuming WAF provides complete protection',
+      'Not reviewing logs for prior exploitation',
     ],
   },
   'ssrf': cweRemediations['CWE-918'],

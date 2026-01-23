@@ -1,15 +1,63 @@
-import { Copy, ExternalLink, Check, Lightbulb, Sparkles } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { Copy, ExternalLink, Check, Lightbulb, Sparkles, History } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { SeverityBadge } from './SeverityBadge';
-import type { NucleiFinding } from '@/types/nuclei';
+import { TestingGuidanceComponent } from './TestingGuidance';
+import { EnrichedReferences } from './EnrichedReferences';
+import { CWEDisplay } from './CWEDisplay';
+import { StatusWorkflow, StatusHistoryTimeline } from './StatusWorkflow';
+import { CommentsSection } from './CommentsSection';
+import type { NucleiFinding, FindingStatus, FindingComment, FindingStatusChange } from '@/types/nuclei';
 import { getRemediation, type RemediationResult } from '@/services/remediation/remediationService';
+import { getTestingGuidance } from '@/data/testingGuidance';
+import {
+  updateFinding,
+  getCommentsByFinding,
+  addComment,
+  updateComment,
+  deleteComment,
+  getStatusHistoryByFinding,
+  addStatusChange,
+} from '@/services/db/indexedDB';
+import { useFindingsStore } from '@/store/findingsStore';
 
 interface FindingDetailProps {
   finding: NucleiFinding;
+  onFindingUpdated?: (finding: NucleiFinding) => void;
+}
+
+// CopyButton component moved outside to avoid recreation during render
+interface CopyButtonProps {
+  text: string;
+  field: string;
+  copiedField: string | null;
+  onCopy: (text: string, field: string) => void;
+}
+
+function CopyButton({ text, field, copiedField, onCopy }: CopyButtonProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6"
+      onClick={() => onCopy(text, field)}
+    >
+      {copiedField === field ? (
+        <Check className="h-3 w-3 text-green-500" />
+      ) : (
+        <Copy className="h-3 w-3" />
+      )}
+    </Button>
+  );
 }
 
 const sourceLabels: Record<RemediationResult['source'], string> = {
@@ -21,10 +69,126 @@ const sourceLabels: Record<RemediationResult['source'], string> = {
   severity: 'General Guidance',
 };
 
-export function FindingDetailComponent({ finding }: FindingDetailProps) {
+export function FindingDetailComponent({ finding, onFindingUpdated }: FindingDetailProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [comments, setComments] = useState<FindingComment[]>([]);
+  const [statusHistory, setStatusHistory] = useState<FindingStatusChange[]>([]);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const updateStoreFinding = useFindingsStore((state) => state.updateFinding);
 
   const remediationResult = useMemo(() => getRemediation(finding), [finding]);
+  const testingGuidance = useMemo(() => getTestingGuidance(finding.info.tags), [finding.info.tags]);
+
+  // Load comments and status history
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [loadedComments, loadedHistory] = await Promise.all([
+          getCommentsByFinding(finding.id),
+          getStatusHistoryByFinding(finding.id),
+        ]);
+        setComments(loadedComments);
+        setStatusHistory(loadedHistory);
+      } catch (error) {
+        console.error('Failed to load comments/history:', error);
+      }
+    };
+    loadData();
+  }, [finding.id]);
+
+  // Handle status change
+  const handleStatusChange = useCallback(
+    async (newStatus: FindingStatus, reason?: string) => {
+      const currentStatus = finding.status || 'new';
+      if (newStatus === currentStatus) return;
+
+      try {
+        // Update the finding
+        const updatedFinding: NucleiFinding = {
+          ...finding,
+          status: newStatus,
+        };
+        await updateFinding(updatedFinding);
+
+        // Record the status change
+        const statusChange: FindingStatusChange = {
+          id: uuidv4(),
+          findingId: finding.id,
+          fromStatus: currentStatus,
+          toStatus: newStatus,
+          changedBy: 'Tester', // TODO: Allow configurable user name
+          reason,
+          changedAt: new Date().toISOString(),
+        };
+        await addStatusChange(statusChange);
+
+        // Update local state
+        setStatusHistory((prev) => [statusChange, ...prev]);
+
+        // Update store
+        updateStoreFinding(updatedFinding);
+
+        // Notify parent
+        onFindingUpdated?.(updatedFinding);
+      } catch (error) {
+        console.error('Failed to update status:', error);
+      }
+    },
+    [finding, updateStoreFinding, onFindingUpdated]
+  );
+
+  // Handle adding a comment
+  const handleAddComment = useCallback(
+    async (author: string, content: string) => {
+      try {
+        const newComment: FindingComment = {
+          id: uuidv4(),
+          findingId: finding.id,
+          author,
+          content,
+          createdAt: new Date().toISOString(),
+        };
+        await addComment(newComment);
+        setComments((prev) => [newComment, ...prev]);
+      } catch (error) {
+        console.error('Failed to add comment:', error);
+      }
+    },
+    [finding.id]
+  );
+
+  // Handle editing a comment
+  const handleEditComment = useCallback(
+    async (commentId: string, content: string) => {
+      try {
+        const existingComment = comments.find((c) => c.id === commentId);
+        if (!existingComment) return;
+
+        const updatedComment: FindingComment = {
+          ...existingComment,
+          content,
+          updatedAt: new Date().toISOString(),
+        };
+        await updateComment(updatedComment);
+        setComments((prev) =>
+          prev.map((c) => (c.id === commentId ? updatedComment : c))
+        );
+      } catch (error) {
+        console.error('Failed to edit comment:', error);
+      }
+    },
+    [comments]
+  );
+
+  // Handle deleting a comment
+  const handleDeleteComment = useCallback(async (commentId: string) => {
+    try {
+      await deleteComment(commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (error) {
+      console.error('Failed to delete comment:', error);
+    }
+  }, []);
 
   const copyToClipboard = async (text: string, field: string) => {
     await navigator.clipboard.writeText(text);
@@ -32,33 +196,52 @@ export function FindingDetailComponent({ finding }: FindingDetailProps) {
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const CopyButton = ({ text, field }: { text: string; field: string }) => (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-6 w-6"
-      onClick={() => copyToClipboard(text, field)}
-    >
-      {copiedField === field ? (
-        <Check className="h-3 w-3 text-green-500" />
-      ) : (
-        <Copy className="h-3 w-3" />
-      )}
-    </Button>
-  );
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">{finding.info.name}</h1>
           <p className="text-muted-foreground font-mono text-sm mt-1">
             {finding.templateId}
           </p>
         </div>
-        <SeverityBadge severity={finding.info.severity} className="text-sm" />
+        <div className="flex items-center gap-3">
+          <StatusWorkflow
+            status={finding.status || 'new'}
+            onStatusChange={handleStatusChange}
+          />
+          <SeverityBadge severity={finding.info.severity} className="text-sm" />
+        </div>
       </div>
+
+      {/* Status History (Collapsible) */}
+      {statusHistory.length > 0 && (
+        <Collapsible open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <History className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-sm font-medium">
+                      Status History ({statusHistory.length})
+                    </CardTitle>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    {isHistoryOpen ? 'Click to collapse' : 'Click to expand'}
+                  </Badge>
+                </div>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent>
+                <StatusHistoryTimeline history={statusHistory} />
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
 
       {/* Quick Info */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -70,7 +253,7 @@ export function FindingDetailComponent({ finding }: FindingDetailProps) {
           </CardHeader>
           <CardContent className="flex items-center justify-between">
             <span className="font-mono text-sm truncate">{finding.host}</span>
-            <CopyButton text={finding.host} field="host" />
+            <CopyButton text={finding.host} field="host" copiedField={copiedField} onCopy={copyToClipboard} />
           </CardContent>
         </Card>
 
@@ -82,7 +265,7 @@ export function FindingDetailComponent({ finding }: FindingDetailProps) {
           </CardHeader>
           <CardContent className="flex items-center justify-between">
             <span className="font-mono text-sm truncate">{finding.matchedAt}</span>
-            <CopyButton text={finding.matchedAt} field="matchedAt" />
+            <CopyButton text={finding.matchedAt} field="matchedAt" copiedField={copiedField} onCopy={copyToClipboard} />
           </CardContent>
         </Card>
 
@@ -95,7 +278,7 @@ export function FindingDetailComponent({ finding }: FindingDetailProps) {
             </CardHeader>
             <CardContent className="flex items-center justify-between">
               <span className="font-mono">{finding.ip}</span>
-              <CopyButton text={finding.ip} field="ip" />
+              <CopyButton text={finding.ip} field="ip" copiedField={copiedField} onCopy={copyToClipboard} />
             </CardContent>
           </Card>
         )}
@@ -153,7 +336,7 @@ export function FindingDetailComponent({ finding }: FindingDetailProps) {
                   <code className="text-sm bg-muted px-2 py-1 rounded">
                     {result}
                   </code>
-                  <CopyButton text={result} field={`result-${index}`} />
+                  <CopyButton text={result} field={`result-${index}`} copiedField={copiedField} onCopy={copyToClipboard} />
                 </li>
               ))}
             </ul>
@@ -166,7 +349,7 @@ export function FindingDetailComponent({ finding }: FindingDetailProps) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-medium">cURL Command</CardTitle>
-            <CopyButton text={finding.curlCommand} field="curl" />
+            <CopyButton text={finding.curlCommand} field="curl" copiedField={copiedField} onCopy={copyToClipboard} />
           </CardHeader>
           <CardContent>
             <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
@@ -207,30 +390,16 @@ export function FindingDetailComponent({ finding }: FindingDetailProps) {
         </Card>
       )}
 
-      {/* References */}
+      {/* CWE Classification */}
+      <CWEDisplay
+        references={finding.info.reference}
+        tags={finding.info.tags}
+        templateId={finding.templateId}
+      />
+
+      {/* Enriched References - Categorized by type */}
       {finding.info.reference.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">References</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-1">
-              {finding.info.reference.map((ref, index) => (
-                <li key={index}>
-                  <a
-                    href={ref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-                  >
-                    {ref}
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <EnrichedReferences references={finding.info.reference} />
       )}
 
       {/* Remediation */}
@@ -295,6 +464,11 @@ export function FindingDetailComponent({ finding }: FindingDetailProps) {
         </Card>
       )}
 
+      {/* Testing Guidance - Next Steps for Testers */}
+      {testingGuidance && (
+        <TestingGuidanceComponent guidance={testingGuidance} />
+      )}
+
       {/* Template Info */}
       <Card>
         <CardHeader>
@@ -335,6 +509,14 @@ export function FindingDetailComponent({ finding }: FindingDetailProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Comments Section */}
+      <CommentsSection
+        comments={comments}
+        onAddComment={handleAddComment}
+        onEditComment={handleEditComment}
+        onDeleteComment={handleDeleteComment}
+      />
     </div>
   );
 }

@@ -3,13 +3,11 @@ import type { NucleiFinding } from '@/types/nuclei';
 import { exportToJson } from './jsonExporter';
 import { exportToCsv } from './csvExporter';
 import { exportToNessus, type NessusExportOptions } from './nessusExporter';
-import { exportToSureFormat, type SureFormatExportOptions } from './sureFormatExporter';
 
-export type ExportFormat = 'json' | 'csv' | 'nessus' | 'sureformat';
+export type ExportFormat = 'json' | 'csv' | 'nessus';
 
 export interface ExportOptions {
   nessus?: NessusExportOptions;
-  sureformat?: SureFormatExportOptions;
 }
 
 interface ExportConfig {
@@ -34,11 +32,6 @@ const exportConfigs: Record<ExportFormat, ExportConfig> = {
     extension: 'nessus',
     mimeType: 'application/xml',
   },
-  sureformat: {
-    name: 'Platform CSV',
-    extension: 'csv',
-    mimeType: 'text/csv',
-  },
 };
 
 function getExporter(format: ExportFormat, options?: ExportOptions): (findings: NucleiFinding[]) => string {
@@ -49,8 +42,6 @@ function getExporter(format: ExportFormat, options?: ExportOptions): (findings: 
       return exportToCsv;
     case 'nessus':
       return (findings) => exportToNessus(findings, options?.nessus);
-    case 'sureformat':
-      return (findings) => exportToSureFormat(findings, options?.sureformat);
   }
 }
 
@@ -78,4 +69,4 @@ export function getExportContent(
 }
 
 export { exportConfigs };
-export type { NessusExportOptions, SureFormatExportOptions };
+export type { NessusExportOptions };

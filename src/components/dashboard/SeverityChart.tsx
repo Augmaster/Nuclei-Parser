@@ -26,7 +26,7 @@ const COLORS: Record<Severity, string> = {
 
 export function SeverityChart({ data, onSeverityClick }: SeverityChartProps) {
   const chartData = Object.entries(data)
-    .filter(([_, value]) => value > 0)
+    .filter(([, value]) => value > 0)
     .map(([severity, value]) => ({
       name: severity.charAt(0).toUpperCase() + severity.slice(1),
       value,

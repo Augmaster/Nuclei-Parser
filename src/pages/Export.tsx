@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, FileJson, FileText, FileCode, Check, FileSpreadsheet, AlertTriangle } from 'lucide-react';
+import { Download, FileJson, FileText, FileCode, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useFilteredFindings, useStats, useFilters } from '@/store/findingsStore';
 import { downloadExport, getExportContent, type ExportFormat, type ExportOptions } from '@/services/exporters';
 
@@ -32,12 +31,6 @@ const formatOptions: {
     description: 'NessusClientData_v2 format. Import into Tenable or Nessus.',
     icon: FileCode,
   },
-  {
-    id: 'sureformat',
-    name: 'Platform CSV',
-    description: 'SureFormat compatible CSV with Asset Group, IP, Hostname columns.',
-    icon: FileSpreadsheet,
-  },
 ];
 
 export function ExportPage() {
@@ -52,10 +45,6 @@ export function ExportPage() {
   const [assetGroup, setAssetGroup] = useState('');
   const [reportName, setReportName] = useState('');
 
-  // SureFormat export options
-  const [sureformatAssetGroup, setSureformatAssetGroup] = useState('');
-  const [clientReference, setClientReference] = useState('');
-
   const hasActiveFilters =
     filters.search ||
     filters.severities.length > 0 ||
@@ -68,14 +57,6 @@ export function ExportPage() {
         nessus: {
           assetGroup: assetGroup.trim() || undefined,
           reportName: reportName.trim() || undefined,
-        },
-      };
-    }
-    if (selectedFormat === 'sureformat') {
-      return {
-        sureformat: {
-          assetGroup: sureformatAssetGroup.trim() || undefined,
-          clientReference: clientReference.trim() || undefined,
         },
       };
     }
@@ -113,18 +94,8 @@ export function ExportPage() {
         </p>
       </div>
 
-      {/* Platform Export Warning */}
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Export to Platform Not Available</AlertTitle>
-        <AlertDescription>
-          The export functionality to import into our reporting platform is not working properly yet.
-          We are working on fixing this issue. In the meantime, you can still export to JSON or CSV for local use.
-        </AlertDescription>
-      </Alert>
-
       {/* Format Selection */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         {formatOptions.map(format => (
           <Card
             key={format.id}
@@ -157,7 +128,7 @@ export function ExportPage() {
           <CardHeader>
             <CardTitle>Nessus Export Options</CardTitle>
             <CardDescription>
-              Configure options for your reporting platform
+              Configure optional metadata for the Nessus XML export
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -173,7 +144,7 @@ export function ExportPage() {
                   onChange={(e) => setAssetGroup(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Name of the asset group in your reporting platform
+                  Optional asset group name for organization
                 </p>
               </div>
               <div className="space-y-2">
@@ -188,50 +159,6 @@ export function ExportPage() {
                 />
                 <p className="text-xs text-muted-foreground">
                   Custom name for the exported report
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* SureFormat Options */}
-      {selectedFormat === 'sureformat' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Platform CSV Options</CardTitle>
-            <CardDescription>
-              Configure options for SureFormat compatible export
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="sureformatAssetGroup" className="text-sm font-medium">
-                  Asset Group
-                </label>
-                <Input
-                  id="sureformatAssetGroup"
-                  placeholder="e.g., Production Servers"
-                  value={sureformatAssetGroup}
-                  onChange={(e) => setSureformatAssetGroup(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Asset group name for all findings in this export
-                </p>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="clientReference" className="text-sm font-medium">
-                  Client Reference
-                </label>
-                <Input
-                  id="clientReference"
-                  placeholder="e.g., CLIENT-001"
-                  value={clientReference}
-                  onChange={(e) => setClientReference(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Optional client reference ID for tracking
                 </p>
               </div>
             </div>

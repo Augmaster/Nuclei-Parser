@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Moon, Sun, Monitor, Shield, ChevronRight, Building2, FolderKanban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,7 +37,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 items-center px-6">
-        <div className="flex items-center gap-3 mr-6">
+        <Link to="/" className="flex items-center gap-3 mr-6 hover:opacity-80 transition-opacity">
           <div className="relative">
             <Shield className="h-8 w-8 text-primary" />
             <div className="absolute inset-0 h-8 w-8 text-primary blur-sm opacity-50">
@@ -47,7 +48,7 @@ export function Header() {
             <span className="font-bold text-lg tracking-tight">Nuclei Viewer</span>
             <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Security Scanner Dashboard</span>
           </div>
-        </div>
+        </Link>
 
         {/* Breadcrumb */}
         {activeCompany && (

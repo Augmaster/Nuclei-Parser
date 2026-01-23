@@ -1,23 +1,26 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Bug, Server, FileCode, Upload, Zap, FolderKanban, RefreshCw } from 'lucide-react';
-import { useStats, useFindingsStore, useIsLoadingFindings } from '@/store/findingsStore';
+import { useStats, useFindingsStore, useIsLoadingFindings, useFilteredFindings } from '@/store/findingsStore';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useActiveProjectId, useActiveProject } from '@/store/organizationStore';
+import { useActiveProjectId, useActiveProject, useActiveCompany } from '@/store/organizationStore';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { SeverityChart } from '@/components/dashboard/SeverityChart';
 import { TopList } from '@/components/dashboard/TopList';
 import { Button } from '@/components/ui/button';
 import { ProjectForm } from '@/components/organization/ProjectForm';
+import { PDFReportDialog } from '@/components/reports/PDFReportDialog';
 import { cn } from '@/lib/utils';
 import type { Severity } from '@/types/nuclei';
 
 export function DashboardPage() {
   const navigate = useNavigate();
   const stats = useStats();
+  const findings = useFilteredFindings();
   const setFilters = useFindingsStore(state => state.setFilters);
   const activeProjectId = useActiveProjectId();
   const activeProject = useActiveProject();
+  const activeCompany = useActiveCompany();
   const isLoading = useIsLoadingFindings();
   const error = useFindingsStore(state => state.error);
   const loadProjectData = useFindingsStore(state => state.loadProjectData);
@@ -123,11 +126,19 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">
-          Overview for <span className="text-foreground font-medium">{activeProject?.name}</span>
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Overview for <span className="text-foreground font-medium">{activeProject?.name}</span>
+          </p>
+        </div>
+        <PDFReportDialog
+          findings={findings}
+          stats={stats}
+          projectName={activeProject?.name}
+          companyName={activeCompany?.name}
+        />
       </div>
 
       {/* Stats Cards */}
