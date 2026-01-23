@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Layout } from '@/components/layout/Layout';
 import { DashboardPage } from '@/pages/Dashboard';
@@ -31,6 +32,7 @@ function App() {
 
   return (
     <TooltipProvider>
+      <Toaster position="top-right" richColors closeButton />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
 import type { Company, Project } from '@/types/organization';
 import {
   companyFromRecord,
@@ -88,6 +89,7 @@ export const useOrganizationStore = create<OrganizationState>((set, get) => ({
       });
     } catch (error) {
       console.error('Failed to initialize organization store:', error);
+      toast.error('Failed to load organizations. Please refresh the page.');
       set({ isLoading: false, isInitialized: true });
     }
   },

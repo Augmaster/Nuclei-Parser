@@ -91,7 +91,7 @@ export function Sidebar() {
                 <div className="text-sm font-medium truncate">{activeProject?.name}</div>
               </div>
 
-              <nav className="space-y-1 px-4">
+              <nav className="space-y-1 px-4" role="navigation" aria-label="Main navigation">
                 {navItems.map(({ to, icon: Icon, label }) => (
                   <NavLink
                     key={to}

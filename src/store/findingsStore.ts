@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { toast } from 'sonner';
 import type { NucleiFinding, UploadedFile, FilterState, Stats } from '@/types/nuclei';
 import { uploadedFileFromRecord, uploadedFileToRecord } from '@/types/nuclei';
 import * as db from '@/services/db/indexedDB';
@@ -26,6 +27,7 @@ interface FindingsState {
 
   // Loading state
   isLoading: boolean;
+  error: string | null;
 
   // Actions
   addFindings: (findings: NucleiFinding[], file: UploadedFile) => Promise<void>;
@@ -37,6 +39,7 @@ interface FindingsState {
   // Project-scoped loading
   loadProjectData: (projectId: string) => Promise<void>;
   clearProjectData: () => void;
+  clearError: () => void;
 }
 
 const defaultFilters: FilterState = {
@@ -170,9 +173,10 @@ export const useFindingsStore = create<FindingsState>((set, get) => ({
   uniqueTags: [],
   uniqueTypes: [],
   isLoading: false,
+  error: null,
 
   loadProjectData: async (projectId: string) => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
 
     try {
       // Load findings and files from IndexedDB for this project
@@ -192,11 +196,17 @@ export const useFindingsStore = create<FindingsState>((set, get) => ({
         filteredFindings,
         ...computed,
         isLoading: false,
+        error: null,
       });
     } catch (error) {
       console.error('Failed to load project data:', error);
-      set({ isLoading: false });
+      toast.error('Failed to load project data. Please try again.');
+      set({ isLoading: false, error: 'Failed to load project data. Please try again.' });
     }
+  },
+
+  clearError: () => {
+    set({ error: null });
   },
 
   clearProjectData: () => {

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatTimestamp } from '@/lib/utils';
 import {
   ChevronDown,
   ChevronUp,
@@ -259,6 +260,8 @@ export function FindingsTable() {
               <TableHead
                 className="cursor-pointer select-none hover:text-foreground transition-colors w-[110px]"
                 onClick={() => handleSort('severity')}
+                aria-sort={sortField === 'severity' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                role="columnheader"
               >
                 <div className="flex items-center">
                   Severity
@@ -268,6 +271,8 @@ export function FindingsTable() {
               <TableHead
                 className="cursor-pointer select-none hover:text-foreground transition-colors"
                 onClick={() => handleSort('templateId')}
+                aria-sort={sortField === 'templateId' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                role="columnheader"
               >
                 <div className="flex items-center">
                   Template
@@ -277,6 +282,8 @@ export function FindingsTable() {
               <TableHead
                 className="cursor-pointer select-none hover:text-foreground transition-colors"
                 onClick={() => handleSort('host')}
+                aria-sort={sortField === 'host' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                role="columnheader"
               >
                 <div className="flex items-center">
                   Host
@@ -287,6 +294,8 @@ export function FindingsTable() {
               <TableHead
                 className="cursor-pointer select-none hover:text-foreground transition-colors"
                 onClick={() => handleSort('timestamp')}
+                aria-sort={sortField === 'timestamp' ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                role="columnheader"
               >
                 <div className="flex items-center">
                   Timestamp
@@ -311,17 +320,17 @@ export function FindingsTable() {
                   </span>
                 </TableCell>
                 <TableCell className="max-w-[200px]">
-                  <span className="truncate block" title={finding.host}>
-                    {finding.host}
+                  <span className="truncate block" title={finding.host || 'No host'}>
+                    {finding.host || <span className="text-muted-foreground italic">N/A</span>}
                   </span>
                 </TableCell>
                 <TableCell className="max-w-[250px]">
-                  <span className="truncate block text-muted-foreground text-sm" title={finding.matchedAt}>
-                    {finding.matchedAt}
+                  <span className="truncate block text-muted-foreground text-sm" title={finding.matchedAt || 'No match location'}>
+                    {finding.matchedAt || <span className="italic">N/A</span>}
                   </span>
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {new Date(finding.timestamp).toLocaleString()}
+                  {formatTimestamp(finding.timestamp)}
                 </TableCell>
               </TableRow>
             ))}
@@ -335,13 +344,14 @@ export function FindingsTable() {
           <span className="text-sm text-muted-foreground">
             Page {page + 1} of {totalPages}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" role="navigation" aria-label="Pagination">
             <Button
               variant="outline"
               size="icon"
               className="h-8 w-8"
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={page === 0}
+              aria-label="Go to previous page"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -351,6 +361,7 @@ export function FindingsTable() {
               className="h-8 w-8"
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
+              aria-label="Go to next page"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

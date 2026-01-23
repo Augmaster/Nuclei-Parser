@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Bug, Server, FileCode, Upload, Zap, FolderKanban } from 'lucide-react';
+import { AlertTriangle, Bug, Server, FileCode, Upload, Zap, FolderKanban, RefreshCw } from 'lucide-react';
 import { useStats, useFindingsStore, useIsLoadingFindings } from '@/store/findingsStore';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useActiveProjectId, useActiveProject } from '@/store/organizationStore';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { SeverityChart } from '@/components/dashboard/SeverityChart';
@@ -18,6 +19,8 @@ export function DashboardPage() {
   const activeProjectId = useActiveProjectId();
   const activeProject = useActiveProject();
   const isLoading = useIsLoadingFindings();
+  const error = useFindingsStore(state => state.error);
+  const loadProjectData = useFindingsStore(state => state.loadProjectData);
   const [showProjectForm, setShowProjectForm] = useState(false);
 
   const uniqueHosts = Object.keys(stats.byHost).length;
@@ -73,6 +76,26 @@ export function DashboardPage() {
       <div className="flex flex-col items-center justify-center h-[60vh] text-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent mb-4" />
         <p className="text-muted-foreground">Loading project data...</p>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
+        <Alert variant="destructive" className="max-w-md mb-6">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Error Loading Data</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button
+          onClick={() => activeProjectId && loadProjectData(activeProjectId)}
+          className="gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Try Again
+        </Button>
       </div>
     );
   }

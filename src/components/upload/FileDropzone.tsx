@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { toast } from 'sonner';
 import { Upload, FileText, X, AlertCircle, CheckCircle, Trash2, FolderKanban } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
@@ -101,6 +102,7 @@ export function FileDropzone() {
       };
 
       addFindings(result.findings, uploadedFile);
+      toast.success(`Uploaded ${result.findings.length} findings from ${file.name}`);
 
       setParseStatuses(prev =>
         prev.map(s =>
@@ -188,6 +190,7 @@ export function FileDropzone() {
 
       <div
         {...getRootProps()}
+        aria-label="File upload dropzone. Drag and drop files here or click to browse."
         className={cn(
           'relative border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-300',
           isDragActive
@@ -195,7 +198,7 @@ export function FileDropzone() {
             : 'border-border hover:border-primary/50 hover:bg-muted/30'
         )}
       >
-        <input {...getInputProps()} />
+        <input {...getInputProps()} aria-label="Select files to upload" />
         <div className={cn(
           "mx-auto h-16 w-16 rounded-full flex items-center justify-center mb-4 transition-all",
           isDragActive ? 'bg-primary/20' : 'bg-muted'
@@ -304,6 +307,7 @@ export function FileDropzone() {
                     size="icon"
                     className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-destructive/10 hover:text-destructive"
                     onClick={() => setFileToRemove(file)}
+                    aria-label={`Remove file ${file.name}`}
                   >
                     <X className="h-4 w-4" />
                   </Button>
