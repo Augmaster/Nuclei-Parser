@@ -29,7 +29,7 @@ The easiest way to run Nuclei Viewer:
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/nuclei-viewer.git
+git clone https://github.com/Augmaster/Nuclei-Parser.git
 cd nuclei-viewer
 
 # Start with Docker Compose
@@ -54,7 +54,7 @@ docker compose down
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/nuclei-viewer.git
+git clone https://github.com/Augmaster/Nuclei-Parser.git
 cd nuclei-viewer
 
 # Install dependencies
@@ -174,8 +174,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- Create an [Issue](https://github.com/YOUR_USERNAME/nuclei-viewer/issues) for bug reports or feature requests
-- Start a [Discussion](https://github.com/YOUR_USERNAME/nuclei-viewer/discussions) for questions
+- Create an [Issue](https://github.com/Augmaster/nuclei-viewer/issues) for bug reports or feature requests
+- Start a [Discussion](https://github.com/Augmaster/nuclei-viewer/discussions) for questions
 
 ---
 

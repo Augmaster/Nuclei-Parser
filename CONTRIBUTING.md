@@ -92,7 +92,7 @@ Feature suggestions are welcome! Please provide:
 
 ```bash
 # Fork and clone the repository
-git clone https://github.com/YOUR_USERNAME/nuclei-viewer.git
+git clone https://github.com/Augmaster/Nuclei-Parser.git
 cd nuclei-viewer
 
 # Install dependencies
