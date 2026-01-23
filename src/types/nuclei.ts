@@ -140,6 +140,76 @@ export interface CVEDetails {
   exploitMaturity?: 'not-defined' | 'unproven' | 'poc' | 'functional' | 'high';
 }
 
+// CISA Known Exploited Vulnerabilities entry
+export interface KEVEntry {
+  cveId: string;
+  vendorProject: string;
+  product: string;
+  vulnerabilityName: string;
+  dateAdded: string;
+  shortDescription: string;
+  requiredAction: string;
+  dueDate: string;
+  knownRansomwareCampaignUse: 'Known' | 'Unknown';
+  notes: string;
+}
+
+// Affected product from CVE data
+export interface AffectedProduct {
+  vendor: string;
+  product: string;
+  versions: string[];
+}
+
+// Vendor advisory link
+export interface VendorAdvisory {
+  vendor: string;
+  url: string;
+  title?: string;
+  patchAvailable: boolean;
+  publishedDate?: string;
+}
+
+// Extended CVE details with KEV and enrichment data
+export interface EnrichedCVEDetails extends CVEDetails {
+  kevEntry?: KEVEntry;
+  affectedProducts?: AffectedProduct[];
+  vendorAdvisories?: VendorAdvisory[];
+  fetchedAt?: string;
+  source?: 'nvd' | 'circl' | 'cache';
+}
+
+// Remediation progress tracking
+export type RemediationProgressStatus = 'not_started' | 'in_progress' | 'blocked' | 'completed';
+
+export interface RemediationProgress {
+  id: string;
+  findingId: string;
+  projectId: string;
+  completedSteps: number[];     // Indices of completed steps
+  customNotes: string;
+  targetDate?: string;
+  status: RemediationProgressStatus;
+  blockerReason?: string;
+  createdAt: string;
+  lastUpdated: string;
+}
+
+// CVE cache entry for IndexedDB
+export interface CVECacheEntry {
+  cveId: string;
+  data: EnrichedCVEDetails;
+  fetchedAt: string;
+  expiresAt: string;
+}
+
+// KEV catalog metadata
+export interface KEVCatalogMeta {
+  id: 'kev-catalog';
+  lastUpdated: string;
+  count: number;
+}
+
 export interface CWEDetails {
   id: string;
   name: string;

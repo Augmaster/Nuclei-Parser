@@ -1,4 +1,4 @@
-import { Copy, ExternalLink, Check, Lightbulb, Sparkles, History } from 'lucide-react';
+import { Copy, Check, History, ExternalLink } from 'lucide-react';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,8 +16,10 @@ import { EnrichedReferences } from './EnrichedReferences';
 import { CWEDisplay } from './CWEDisplay';
 import { StatusWorkflow, StatusHistoryTimeline } from './StatusWorkflow';
 import { CommentsSection } from './CommentsSection';
+import { CVEDetailPanel } from './CVEDetailPanel';
+import { RemediationPanel } from './RemediationPanel';
+import { ExternalResourceLinks } from './ExternalResourceLinks';
 import type { NucleiFinding, FindingStatus, FindingComment, FindingStatusChange } from '@/types/nuclei';
-import { getRemediation, type RemediationResult } from '@/services/remediation/remediationService';
 import { getTestingGuidance } from '@/data/testingGuidance';
 import {
   updateFinding,
@@ -60,15 +62,6 @@ function CopyButton({ text, field, copiedField, onCopy }: CopyButtonProps) {
   );
 }
 
-const sourceLabels: Record<RemediationResult['source'], string> = {
-  template: 'From Template',
-  cwe: 'Based on CWE',
-  cve: 'Based on CVE',
-  tag: 'Based on Tag',
-  type: 'Based on Type',
-  severity: 'General Guidance',
-};
-
 export function FindingDetailComponent({ finding, onFindingUpdated }: FindingDetailProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [comments, setComments] = useState<FindingComment[]>([]);
@@ -76,7 +69,6 @@ export function FindingDetailComponent({ finding, onFindingUpdated }: FindingDet
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const updateStoreFinding = useFindingsStore((state) => state.updateFinding);
 
-  const remediationResult = useMemo(() => getRemediation(finding), [finding]);
   const testingGuidance = useMemo(() => getTestingGuidance(finding.info.tags), [finding.info.tags]);
 
   // Load comments and status history
@@ -402,67 +394,21 @@ export function FindingDetailComponent({ finding, onFindingUpdated }: FindingDet
         <EnrichedReferences references={finding.info.reference} />
       )}
 
-      {/* Remediation */}
-      {remediationResult && (
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-transparent">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {remediationResult.source === 'template' ? (
-                  <Lightbulb className="h-5 w-5 text-primary" />
-                ) : (
-                  <Sparkles className="h-5 w-5 text-primary" />
-                )}
-                <CardTitle className="text-sm font-medium">Remediation</CardTitle>
-              </div>
-              <Badge variant="outline" className="text-xs">
-                {sourceLabels[remediationResult.source]}
-                {remediationResult.sourceDetail && `: ${remediationResult.sourceDetail}`}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {remediationResult.remediation.title && remediationResult.source !== 'template' && (
-              <h4 className="font-semibold text-sm">{remediationResult.remediation.title}</h4>
-            )}
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-              {remediationResult.remediation.description}
-            </p>
-            {remediationResult.remediation.steps.length > 0 && (
-              <div className="space-y-2">
-                <h5 className="text-sm font-medium">Recommended Steps:</h5>
-                <ol className="list-decimal list-inside space-y-1.5 text-sm">
-                  {remediationResult.remediation.steps.map((step, index) => (
-                    <li key={index} className="text-muted-foreground">
-                      <span className="text-foreground">{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            )}
-            {remediationResult.remediation.references && remediationResult.remediation.references.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-border/50">
-                <h5 className="text-sm font-medium">Additional Resources:</h5>
-                <ul className="space-y-1">
-                  {remediationResult.remediation.references.map((ref, index) => (
-                    <li key={index}>
-                      <a
-                        href={ref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-                      >
-                        {ref}
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {/* CVE Intelligence Panel */}
+      <CVEDetailPanel
+        references={finding.info.reference}
+        templateId={finding.templateId}
+        findingName={finding.info.name}
+      />
+
+      {/* External Security Resources */}
+      <ExternalResourceLinks
+        references={finding.info.reference}
+        tags={finding.info.tags}
+      />
+
+      {/* Remediation with Tracking */}
+      <RemediationPanel finding={finding} />
 
       {/* Testing Guidance - Next Steps for Testers */}
       {testingGuidance && (

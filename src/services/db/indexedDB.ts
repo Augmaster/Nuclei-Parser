@@ -1,8 +1,18 @@
-import type { NucleiFinding, UploadedFileRecord, FindingComment, FindingStatusChange, Scan } from '@/types/nuclei';
+import type {
+  NucleiFinding,
+  UploadedFileRecord,
+  FindingComment,
+  FindingStatusChange,
+  Scan,
+  CVECacheEntry,
+  KEVEntry,
+  KEVCatalogMeta,
+  RemediationProgress,
+} from '@/types/nuclei';
 import type { CompanyRecord, ProjectRecord } from '@/types/organization';
 
 const DB_NAME = 'nuclei-viewer-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // Store names
 const STORES = {
@@ -13,6 +23,9 @@ const STORES = {
   COMMENTS: 'comments',
   STATUS_HISTORY: 'statusHistory',
   SCANS: 'scans',
+  CVE_CACHE: 'cveCache',
+  KEV_CATALOG: 'kevCatalog',
+  REMEDIATION_PROGRESS: 'remediationProgress',
 } as const;
 
 let dbInstance: IDBDatabase | null = null;
@@ -80,6 +93,26 @@ export async function getDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORES.SCANS)) {
         const scansStore = db.createObjectStore(STORES.SCANS, { keyPath: 'id' });
         scansStore.createIndex('projectId', 'projectId', { unique: false });
+      }
+
+      // CVE Cache store with index on expiresAt (Remediation Enhancement)
+      if (!db.objectStoreNames.contains(STORES.CVE_CACHE)) {
+        const cveCacheStore = db.createObjectStore(STORES.CVE_CACHE, { keyPath: 'cveId' });
+        cveCacheStore.createIndex('expiresAt', 'expiresAt', { unique: false });
+      }
+
+      // KEV Catalog store (Remediation Enhancement)
+      if (!db.objectStoreNames.contains(STORES.KEV_CATALOG)) {
+        const kevStore = db.createObjectStore(STORES.KEV_CATALOG, { keyPath: 'cveId' });
+        kevStore.createIndex('dueDate', 'dueDate', { unique: false });
+      }
+
+      // Remediation Progress store with indexes (Remediation Enhancement)
+      if (!db.objectStoreNames.contains(STORES.REMEDIATION_PROGRESS)) {
+        const remediationStore = db.createObjectStore(STORES.REMEDIATION_PROGRESS, { keyPath: 'id' });
+        remediationStore.createIndex('findingId', 'findingId', { unique: true });
+        remediationStore.createIndex('projectId', 'projectId', { unique: false });
+        remediationStore.createIndex('status', 'status', { unique: false });
       }
     };
   });
@@ -656,6 +689,289 @@ export async function deleteScansByProject(projectId: string): Promise<void> {
 }
 
 // =============================================================================
+// CVE Cache Operations (Remediation Enhancement)
+// =============================================================================
+
+export async function getCVEFromCache(cveId: string): Promise<CVECacheEntry | undefined> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.CVE_CACHE, 'readonly');
+    const store = transaction.objectStore(STORES.CVE_CACHE);
+    const request = store.get(cveId);
+
+    request.onsuccess = () => {
+      const entry = request.result;
+      // Check if expired
+      if (entry && new Date(entry.expiresAt) > new Date()) {
+        resolve(entry);
+      } else {
+        resolve(undefined);
+      }
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function setCVECache(entry: CVECacheEntry): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.CVE_CACHE, 'readwrite');
+    const store = transaction.objectStore(STORES.CVE_CACHE);
+    const request = store.put(entry);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteCVEFromCache(cveId: string): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.CVE_CACHE, 'readwrite');
+    const store = transaction.objectStore(STORES.CVE_CACHE);
+    const request = store.delete(cveId);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function clearExpiredCVECache(): Promise<number> {
+  const db = await getDB();
+  const now = new Date().toISOString();
+  let deletedCount = 0;
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.CVE_CACHE, 'readwrite');
+    const store = transaction.objectStore(STORES.CVE_CACHE);
+    const index = store.index('expiresAt');
+    const range = IDBKeyRange.upperBound(now);
+    const request = index.openCursor(range);
+
+    request.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        cursor.delete();
+        deletedCount++;
+        cursor.continue();
+      } else {
+        resolve(deletedCount);
+      }
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function clearAllCVECache(): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.CVE_CACHE, 'readwrite');
+    const store = transaction.objectStore(STORES.CVE_CACHE);
+    const request = store.clear();
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// =============================================================================
+// KEV Catalog Operations (Remediation Enhancement)
+// =============================================================================
+
+export async function getKEVEntry(cveId: string): Promise<KEVEntry | undefined> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.KEV_CATALOG, 'readonly');
+    const store = transaction.objectStore(STORES.KEV_CATALOG);
+    const request = store.get(cveId);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getKEVEntries(cveIds: string[]): Promise<Map<string, KEVEntry>> {
+  const db = await getDB();
+  const results = new Map<string, KEVEntry>();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.KEV_CATALOG, 'readonly');
+    const store = transaction.objectStore(STORES.KEV_CATALOG);
+    let completed = 0;
+
+    if (cveIds.length === 0) {
+      resolve(results);
+      return;
+    }
+
+    for (const cveId of cveIds) {
+      const request = store.get(cveId);
+      request.onsuccess = () => {
+        if (request.result) {
+          results.set(cveId, request.result);
+        }
+        completed++;
+        if (completed === cveIds.length) {
+          resolve(results);
+        }
+      };
+      request.onerror = () => reject(request.error);
+    }
+  });
+}
+
+export async function getAllKEVEntries(): Promise<KEVEntry[]> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.KEV_CATALOG, 'readonly');
+    const store = transaction.objectStore(STORES.KEV_CATALOG);
+    const request = store.getAll();
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function setKEVCatalog(entries: KEVEntry[]): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.KEV_CATALOG, 'readwrite');
+    const store = transaction.objectStore(STORES.KEV_CATALOG);
+
+    // Clear existing entries first
+    const clearRequest = store.clear();
+    clearRequest.onsuccess = () => {
+      if (entries.length === 0) {
+        resolve();
+        return;
+      }
+
+      let completed = 0;
+      for (const entry of entries) {
+        const request = store.add(entry);
+        request.onsuccess = () => {
+          completed++;
+          if (completed === entries.length) resolve();
+        };
+        request.onerror = () => reject(request.error);
+      }
+    };
+    clearRequest.onerror = () => reject(clearRequest.error);
+  });
+}
+
+export async function getKEVCatalogMeta(): Promise<KEVCatalogMeta | undefined> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.KEV_CATALOG, 'readonly');
+    const store = transaction.objectStore(STORES.KEV_CATALOG);
+    const request = store.get('kev-catalog');
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function setKEVCatalogMeta(meta: KEVCatalogMeta): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.KEV_CATALOG, 'readwrite');
+    const store = transaction.objectStore(STORES.KEV_CATALOG);
+    const request = store.put(meta);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// =============================================================================
+// Remediation Progress Operations (Remediation Enhancement)
+// =============================================================================
+
+export async function getRemediationProgress(findingId: string): Promise<RemediationProgress | undefined> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.REMEDIATION_PROGRESS, 'readonly');
+    const store = transaction.objectStore(STORES.REMEDIATION_PROGRESS);
+    const index = store.index('findingId');
+    const request = index.get(findingId);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function getRemediationProgressByProject(projectId: string): Promise<RemediationProgress[]> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.REMEDIATION_PROGRESS, 'readonly');
+    const store = transaction.objectStore(STORES.REMEDIATION_PROGRESS);
+    const index = store.index('projectId');
+    const request = index.getAll(projectId);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function addRemediationProgress(progress: RemediationProgress): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.REMEDIATION_PROGRESS, 'readwrite');
+    const store = transaction.objectStore(STORES.REMEDIATION_PROGRESS);
+    const request = store.add(progress);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function updateRemediationProgress(progress: RemediationProgress): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.REMEDIATION_PROGRESS, 'readwrite');
+    const store = transaction.objectStore(STORES.REMEDIATION_PROGRESS);
+    const request = store.put(progress);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteRemediationProgress(id: string): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.REMEDIATION_PROGRESS, 'readwrite');
+    const store = transaction.objectStore(STORES.REMEDIATION_PROGRESS);
+    const request = store.delete(id);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function deleteRemediationProgressByProject(projectId: string): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.REMEDIATION_PROGRESS, 'readwrite');
+    const store = transaction.objectStore(STORES.REMEDIATION_PROGRESS);
+    const index = store.index('projectId');
+    const request = index.openCursor(projectId);
+
+    request.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+      } else {
+        resolve();
+      }
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// =============================================================================
 // Cascade Delete Operations
 // =============================================================================
 
@@ -678,12 +994,13 @@ export async function cascadeDeleteCompany(companyId: string): Promise<void> {
 }
 
 /**
- * Delete a project and all its associated findings, files, and scans
+ * Delete a project and all its associated findings, files, scans, and remediation progress
  */
 export async function cascadeDeleteProject(projectId: string): Promise<void> {
   await deleteFindingsByProject(projectId);
   await deleteUploadedFilesByProject(projectId);
   await deleteScansByProject(projectId);
+  await deleteRemediationProgressByProject(projectId);
   await deleteProject(projectId);
 }
 
@@ -696,7 +1013,18 @@ export async function cascadeDeleteProject(projectId: string): Promise<void> {
  */
 export async function clearAllData(): Promise<void> {
   const db = await getDB();
-  const stores = [STORES.COMPANIES, STORES.PROJECTS, STORES.FINDINGS, STORES.UPLOADED_FILES, STORES.COMMENTS, STORES.STATUS_HISTORY, STORES.SCANS];
+  const stores = [
+    STORES.COMPANIES,
+    STORES.PROJECTS,
+    STORES.FINDINGS,
+    STORES.UPLOADED_FILES,
+    STORES.COMMENTS,
+    STORES.STATUS_HISTORY,
+    STORES.SCANS,
+    STORES.CVE_CACHE,
+    STORES.KEV_CATALOG,
+    STORES.REMEDIATION_PROGRESS,
+  ];
 
   for (const storeName of stores) {
     await new Promise<void>((resolve, reject) => {
