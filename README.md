@@ -19,7 +19,21 @@ A modern web-based dashboard for parsing, organizing, and analyzing [Nuclei](htt
 
 ## Screenshots
 
-*Screenshots coming soon*
+### Upload Interface
+![Upload Interface](images/upload.png)
+*Drag-and-drop Nuclei scan files and organize them by company and project*
+
+### Findings Dashboard
+![Findings Dashboard](images/findings.png)
+*Browse and filter findings with advanced search capabilities*
+
+### Detailed Finding View
+![Finding Details](images/Apache%20Finding.png)
+*View complete finding information including request/response data and curl commands
+
+### Host Risk Analysis
+![Host Risk Analysis](images/Host%20Risk.png)
+*Analyze vulnerability distribution across hosts*
 
 ## Quick Start
 
