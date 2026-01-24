@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Moon, Sun, Monitor, Shield, ChevronRight, Building2, FolderKanban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,18 +9,26 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useThemeStore, applyTheme } from '@/store/themeStore';
 import { useEffect } from 'react';
-import { useStats } from '@/store/findingsStore';
+import { useStats, useFindingsStore } from '@/store/findingsStore';
 import { useActiveCompany, useActiveProject } from '@/store/organizationStore';
+import type { Severity } from '@/types/nuclei';
 
 export function Header() {
+  const navigate = useNavigate();
   const { theme, setTheme } = useThemeStore();
   const stats = useStats();
+  const setFilters = useFindingsStore(state => state.setFilters);
   const activeCompany = useActiveCompany();
   const activeProject = useActiveProject();
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  const handleSeverityClick = (severity: Severity) => {
+    setFilters({ severities: [severity] });
+    navigate('/findings');
+  };
 
   // Listen for system theme changes
   useEffect(() => {
@@ -67,27 +75,47 @@ export function Header() {
 
         {stats.total > 0 && (
           <div className="hidden md:flex items-center gap-3 px-4 py-1.5 rounded-full bg-muted/50 border border-border/50">
-            <div className="flex items-center gap-1.5">
+            <div
+              className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity"
+              onClick={() => handleSeverityClick('critical')}
+              title="Click to view critical findings"
+            >
               <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
               <span className="text-xs font-medium">{stats.bySeverity.critical} Critical</span>
             </div>
             <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-1.5">
+            <div
+              className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity"
+              onClick={() => handleSeverityClick('high')}
+              title="Click to view high severity findings"
+            >
               <div className="h-2 w-2 rounded-full bg-orange-500" />
               <span className="text-xs font-medium">{stats.bySeverity.high} High</span>
             </div>
             <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-1.5">
+            <div
+              className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity"
+              onClick={() => handleSeverityClick('medium')}
+              title="Click to view medium severity findings"
+            >
               <div className="h-2 w-2 rounded-full bg-amber-400" />
               <span className="text-xs font-medium">{stats.bySeverity.medium} Medium</span>
             </div>
             <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-1.5">
+            <div
+              className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity"
+              onClick={() => handleSeverityClick('low')}
+              title="Click to view low severity findings"
+            >
               <div className="h-2 w-2 rounded-full bg-blue-500" />
               <span className="text-xs font-medium">{stats.bySeverity.low} Low</span>
             </div>
             <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-1.5">
+            <div
+              className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity"
+              onClick={() => handleSeverityClick('info')}
+              title="Click to view info findings"
+            >
               <div className="h-2 w-2 rounded-full bg-slate-400" />
               <span className="text-xs font-medium">{stats.bySeverity.info} Info</span>
             </div>
