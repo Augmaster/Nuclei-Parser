@@ -36,11 +36,36 @@ cd nuclei-viewer
 docker compose up -d
 ```
 
-The application will be available at **http://localhost:3000**
+The application will be available at **http://localhost:3001**
 
 To stop:
 ```bash
 docker compose down
+```
+
+#### Data Persistence
+
+**Important**: Nuclei Viewer stores all data in your browser's IndexedDB (client-side storage). This means:
+
+- **Data persists in your browser** across container restarts and updates
+- **No server-side database** is used - the Docker container is stateless
+- **Data is tied to your browser** - clearing browser data will delete your findings
+- **Backup recommended** - Use the Export feature to backup your data regularly
+
+The Docker setup includes optional volume mounts for nginx logs and cache:
+```yaml
+volumes:
+  - ./docker-volumes/nginx-logs:/var/log/nginx
+  - ./docker-volumes/nginx-cache:/var/cache/nginx
+```
+
+These volumes will be created automatically and persist across container restarts. To clean up volumes:
+```bash
+# Remove containers and volumes
+docker compose down -v
+
+# Or manually remove the volume directory
+rm -rf ./docker-volumes
 ```
 
 ### Manual Installation

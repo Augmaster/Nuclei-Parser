@@ -4,3 +4,10 @@ services:
     ports:
       - "3001:80"
     restart: unless-stopped
+    volumes:
+      # Optional: Mount volume for nginx logs (persists across container restarts)
+      - ./docker-volumes/nginx-logs:/var/log/nginx
+      # Optional: Mount volume for nginx cache
+      - ./docker-volumes/nginx-cache:/var/cache/nginx
+    environment:
+      - TZ=UTC

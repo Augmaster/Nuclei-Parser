@@ -7,3 +7,4 @@ README.md
 .env.*
 .vscode
 .idea
+docker-volumes
