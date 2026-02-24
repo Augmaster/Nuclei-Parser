@@ -185,16 +185,6 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-## Roadmap
-
-- [ ] Add test coverage
-- [ ] Implement finding status tracking (open/resolved/false positive)
-- [ ] Add comparison between scans
-- [ ] Support additional scanner formats (Nmap, Burp, etc.)
-- [ ] Add report generation with customizable templates
-- [ ] Implement data import/export for backup
-- [ ] Add keyboard shortcuts
-
 ## Security
 
 This application runs entirely in your browser. No data is sent to any server. All findings are stored locally in IndexedDB.
