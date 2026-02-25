@@ -26,3 +26,6 @@ docker-volumes/
 *.sln
 *.sw?
 example/
+
+# Local overrides — never commit (may contain secrets like Tailscale auth keys)
+docker-compose.override.yml
