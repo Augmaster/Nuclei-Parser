@@ -40,6 +40,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/multi-select';
 import { SeverityBadge } from './SeverityBadge';
+import { StatusBadge } from './StatusWorkflow';
 import { BulkActionBar } from './BulkActionBar';
 import {
   useFindingsStore,
@@ -419,6 +420,7 @@ export function FindingsTable() {
                   <SortIcon field="severity" sortField={sortField} sortDirection={sortDirection} />
                 </div>
               </TableHead>
+              <TableHead className="w-[130px]">Status</TableHead>
               <TableHead
                 className="cursor-pointer select-none hover:text-foreground transition-colors"
                 onClick={() => handleSort('templateId')}
@@ -473,6 +475,9 @@ export function FindingsTable() {
                 </TableCell>
                 <TableCell>
                   <SeverityBadge severity={finding.info.severity} />
+                </TableCell>
+                <TableCell>
+                  <StatusBadge status={finding.status || 'new'} />
                 </TableCell>
                 <TableCell>
                   <span className="font-mono text-sm group-hover:text-primary transition-colors">
