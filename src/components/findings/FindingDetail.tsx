@@ -11,6 +11,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { SeverityBadge } from './SeverityBadge';
+import { CodeBlock } from '@/components/ui/code-block';
+import { HttpDetailBlock } from './HttpDetailBlock';
 import { TestingGuidanceComponent } from './TestingGuidance';
 import { EnrichedReferences } from './EnrichedReferences';
 import { CWEDisplay } from './CWEDisplay';
@@ -339,14 +341,11 @@ export function FindingDetailComponent({ finding, onFindingUpdated }: FindingDet
       {/* Curl Command */}
       {finding.curlCommand && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <CardTitle className="text-sm font-medium">cURL Command</CardTitle>
-            <CopyButton text={finding.curlCommand} field="curl" copiedField={copiedField} onCopy={copyToClipboard} />
           </CardHeader>
           <CardContent>
-            <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
-              {finding.curlCommand}
-            </pre>
+            <CodeBlock code={finding.curlCommand} language="bash" maxHeight="12rem" />
           </CardContent>
         </Card>
       )}
@@ -358,23 +357,19 @@ export function FindingDetailComponent({ finding, onFindingUpdated }: FindingDet
             <CardTitle className="text-sm font-medium">HTTP Details</CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="request">
+            <Tabs defaultValue={finding.request ? 'request' : 'response'}>
               <TabsList>
                 {finding.request && <TabsTrigger value="request">Request</TabsTrigger>}
                 {finding.response && <TabsTrigger value="response">Response</TabsTrigger>}
               </TabsList>
               {finding.request && (
                 <TabsContent value="request">
-                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-96">
-                    {finding.request}
-                  </pre>
+                  <HttpDetailBlock raw={finding.request} maxHeight="32rem" />
                 </TabsContent>
               )}
               {finding.response && (
                 <TabsContent value="response">
-                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto max-h-96">
-                    {finding.response}
-                  </pre>
+                  <HttpDetailBlock raw={finding.response} maxHeight="32rem" />
                 </TabsContent>
               )}
             </Tabs>
