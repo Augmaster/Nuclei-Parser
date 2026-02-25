@@ -51,6 +51,7 @@ const defaultFilters: FilterState = {
   templates: [],
   tags: [],
   types: [],
+  statuses: [],
 };
 
 const defaultStats: Stats = {
@@ -157,6 +158,12 @@ function applyFilters(findings: NucleiFinding[], filters: FilterState): NucleiFi
     // Type filter
     if (filters.types.length > 0) {
       if (!filters.types.includes(finding.type)) return false;
+    }
+
+    // Status filter (undefined status treated as 'new')
+    if (filters.statuses.length > 0) {
+      const effectiveStatus = finding.status || 'new';
+      if (!filters.statuses.includes(effectiveStatus)) return false;
     }
 
     return true;

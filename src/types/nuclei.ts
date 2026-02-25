@@ -106,6 +106,7 @@ export interface FilterState {
   templates: string[];
   tags: string[];
   types: string[];
+  statuses: FindingStatus[];
 }
 
 export interface Stats {
