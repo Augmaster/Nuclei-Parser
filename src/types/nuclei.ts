@@ -116,6 +116,7 @@ export interface Stats {
   byTemplate: Record<string, number>;
   byTag: Record<string, number>;
   byType: Record<string, number>;
+  byStatus: Record<FindingStatus, number>;
 }
 
 // ============================================

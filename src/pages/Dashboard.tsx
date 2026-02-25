@@ -6,12 +6,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useActiveProjectId, useActiveProject, useActiveCompany } from '@/store/organizationStore';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { SeverityChart } from '@/components/dashboard/SeverityChart';
+import { StatusBreakdown } from '@/components/dashboard/StatusBreakdown';
 import { TopList } from '@/components/dashboard/TopList';
 import { Button } from '@/components/ui/button';
 import { ProjectForm } from '@/components/organization/ProjectForm';
 import { PDFReportDialog } from '@/components/reports/PDFReportDialog';
 import { cn } from '@/lib/utils';
-import type { Severity } from '@/types/nuclei';
+import type { Severity, FindingStatus } from '@/types/nuclei';
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -41,6 +42,11 @@ export function DashboardPage() {
 
   const handleSeverityClick = (severity: Severity) => {
     setFilters({ severities: [severity] });
+    navigate('/findings');
+  };
+
+  const handleStatusClick = (status: FindingStatus) => {
+    setFilters({ statuses: [status] });
     navigate('/findings');
   };
 
@@ -192,9 +198,9 @@ export function DashboardPage() {
           data={stats.byTemplate}
           onItemClick={handleTemplateClick}
         />
-        <TopList
-          title="Finding Types"
-          data={stats.byType}
+        <StatusBreakdown
+          data={stats.byStatus}
+          onStatusClick={handleStatusClick}
         />
       </div>
     </div>

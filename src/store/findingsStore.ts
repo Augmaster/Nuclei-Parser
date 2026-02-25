@@ -61,6 +61,7 @@ const defaultStats: Stats = {
   byTemplate: {},
   byTag: {},
   byType: {},
+  byStatus: { new: 0, in_progress: 0, verified: 0, false_positive: 0, remediated: 0, accepted_risk: 0, closed: 0 },
 };
 
 interface ComputedData {
@@ -79,6 +80,7 @@ function computeData(findings: NucleiFinding[]): ComputedData {
     byTemplate: {},
     byTag: {},
     byType: {},
+    byStatus: { new: 0, in_progress: 0, verified: 0, false_positive: 0, remediated: 0, accepted_risk: 0, closed: 0 },
   };
 
   const hostsSet = new Set<string>();
@@ -108,6 +110,10 @@ function computeData(findings: NucleiFinding[]): ComputedData {
       stats.byTag[tag] = (stats.byTag[tag] || 0) + 1;
       tagsSet.add(tag);
     }
+
+    // By status (undefined treated as 'new')
+    const status = finding.status || 'new';
+    stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
   }
 
   return {
