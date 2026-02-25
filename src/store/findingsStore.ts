@@ -201,6 +201,16 @@ export const useFindingsStore = create<FindingsState>((set, get) => ({
       ]);
 
       const uploadedFiles = fileRecords.map(uploadedFileFromRecord);
+
+      // Backfill status for findings that predate the status feature
+      const findingsNeedingStatus = findings.filter(f => !f.status);
+      if (findingsNeedingStatus.length > 0) {
+        for (const finding of findingsNeedingStatus) {
+          finding.status = 'new';
+          await db.updateFinding(finding);
+        }
+      }
+
       const computed = computeData(findings);
       const filteredFindings = applyFilters(findings, get().filters);
 
