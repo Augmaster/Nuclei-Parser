@@ -74,6 +74,17 @@ const severityOptions: MultiSelectOption[] = [
   { value: 'info', label: 'Info' },
 ];
 
+// Status options for multi-select
+const statusFilterOptions: MultiSelectOption[] = [
+  { value: 'new', label: 'New' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'verified', label: 'Verified' },
+  { value: 'false_positive', label: 'False Positive' },
+  { value: 'remediated', label: 'Remediated' },
+  { value: 'accepted_risk', label: 'Accepted Risk' },
+  { value: 'closed', label: 'Closed' },
+];
+
 // Helper to copy text to clipboard
 const copyToClipboard = async (text: string, label: string) => {
   try {
@@ -251,7 +262,8 @@ export function FindingsTable() {
     filters.hosts.length > 0 ||
     filters.templates.length > 0 ||
     filters.tags.length > 0 ||
-    filters.types.length > 0;
+    filters.types.length > 0 ||
+    filters.statuses.length > 0;
 
   const activeFilterCount = [
     filters.search ? 1 : 0,
@@ -260,6 +272,7 @@ export function FindingsTable() {
     filters.templates.length,
     filters.tags.length,
     filters.types.length,
+    filters.statuses.length,
   ].reduce((a, b) => a + b, 0);
 
   if (findings.length === 0 && !hasActiveFilters) {
@@ -336,6 +349,14 @@ export function FindingsTable() {
               onChange={(types) => setFilters({ types })}
               placeholder="Type"
               className="w-[120px]"
+            />
+
+            <MultiSelect
+              options={statusFilterOptions}
+              selected={filters.statuses}
+              onChange={(statuses) => setFilters({ statuses: statuses as FindingStatus[] })}
+              placeholder="Status"
+              className="w-[150px]"
             />
 
             {hasActiveFilters && (
