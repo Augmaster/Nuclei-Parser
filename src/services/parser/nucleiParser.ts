@@ -43,6 +43,7 @@ function transformRawFinding(raw: NucleiRawFinding, sourceFileId: string): Nucle
     request: raw.request,
     response: raw.response,
     sourceFile: sourceFileId,
+    status: 'new',
   };
 }
 
