@@ -3,14 +3,21 @@ set -e
 
 cd /app
 
-echo "[startup] Pulling latest code..."
-CURRENT=$(git rev-parse HEAD 2>/dev/null || echo "none")
+CURRENT="none"
+LATEST="none"
 
-# Use HTTPS so no SSH key is needed (works for public repos)
-git remote set-url origin https://github.com/Augmaster/Nuclei-Parser.git
-git pull origin main 2>&1 || echo "[startup] Warning: git pull failed, using current code"
+if [ -d ".git" ]; then
+  echo "[startup] Pulling latest code..."
+  CURRENT=$(git rev-parse HEAD 2>/dev/null || echo "none")
 
-LATEST=$(git rev-parse HEAD 2>/dev/null || echo "none")
+  # Use HTTPS so no SSH key is needed (works for public repos)
+  git remote set-url origin https://github.com/Augmaster/Nuclei-Parser.git
+  git pull origin main 2>&1 || echo "[startup] Warning: git pull failed, using current code"
+
+  LATEST=$(git rev-parse HEAD 2>/dev/null || echo "none")
+else
+  echo "[startup] No .git directory found, using code baked into the image."
+fi
 
 if [ "$CURRENT" != "$LATEST" ] || [ ! -d "/usr/share/nginx/html/assets" ]; then
   echo "[startup] Changes detected, rebuilding application..."
